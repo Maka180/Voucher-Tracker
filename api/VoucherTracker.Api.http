@@ -1,0 +1,6 @@
+@VoucherTracker.Api_HostAddress = http://localhost:5137
+
+GET {{VoucherTracker.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
