@@ -3,6 +3,7 @@ api/bin/
 api/obj/
 *.user
 *.suo
+api/*.db
 
 # ===== Node / React =====
 client/node_modules/
