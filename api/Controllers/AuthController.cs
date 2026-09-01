@@ -13,11 +13,13 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly TokenService _tokenService;
+    private readonly AuditService _audit;
 
-    public AuthController(AppDbContext db, TokenService tokenService)
+    public AuthController(AppDbContext db, TokenService tokenService,  AuditService audit)
     {
         _db = db;
         _tokenService = tokenService;
+        _audit = audit;
     }
 
     [HttpPost("register")]
@@ -38,6 +40,7 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var token = _tokenService.CreateToken(user);
+        await _audit.LogAsync(user.Id, "Register", "User", user.Id);
         return Ok(new AuthResponse(token, user.FullName, user.Role));
     }
 
@@ -50,6 +53,7 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid phone number or password.");
 
         var token = _tokenService.CreateToken(user);
+        await _audit.LogAsync(user.Id, "Login", "User", user.Id);
         return Ok(new AuthResponse(token, user.FullName, user.Role));
     }
 }

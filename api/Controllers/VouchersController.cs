@@ -17,11 +17,13 @@ public class VouchersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly PinService _pinService;
+    private readonly AuditService _audit;
 
-    public VouchersController(AppDbContext db, PinService pinService)
+    public VouchersController(AppDbContext db, PinService pinService, AuditService audit)
     {
         _db = db;
         _pinService = pinService;
+        _audit = audit;
     }
 
     private int CurrentUserId =>
@@ -47,6 +49,7 @@ public class VouchersController : ControllerBase
 
         _db.Vouchers.Add(voucher);
         await _db.SaveChangesAsync();
+        await _audit.LogAsync(CurrentUserId, "CreateVoucher", "Voucher", voucher.Id, $"Amount={voucher.Amount}, Recipient={voucher.RecipientPhone}");
 
         return Ok(new VoucherResponse(
             voucher.Id, voucher.Amount, voucher.RecipientPhone,
@@ -125,10 +128,12 @@ public async Task<ActionResult<RedemptionResponse>> RedeemVoucher(int id, Redeem
     {
         await _db.SaveChangesAsync();
         var remaining = 3 - (recentFailures + 1);
+        await _audit.LogAsync(null, "VoucherLocked", "Voucher", voucher.Id, $"IP={ip}");
         return BadRequest(new RedemptionResponse(false, $"Incorrect PIN. {remaining} attempt(s) remaining."));
     }
 
     voucher.Status = "Redeemed";
+    await _audit.LogAsync(null, "RedeemVoucher", "Voucher", voucher.Id, $"Success, IP={ip}");
     voucher.RedeemedAt = DateTime.UtcNow;
     await _db.SaveChangesAsync();
 
