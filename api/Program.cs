@@ -12,6 +12,7 @@ builder.Services.AddDbContext<VoucherTracker.Api.Data.AppDbContext>(options =>
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<PinService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddHostedService<FraudDetectionService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
