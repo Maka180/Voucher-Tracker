@@ -13,7 +13,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<PinService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddHostedService<FraudDetectionService>();
-builder.Services.AddHttpClient<IFraudExplanationService, ClaudeFraudExplanationService>();
+builder.Services.AddHttpClient<IFraudExplanationService, GeminiFraudExplanationService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

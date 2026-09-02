@@ -9,13 +9,13 @@ public interface IFraudExplanationService
     Task<string> ExplainAsync(FraudFlag flag, Voucher voucher, List<RedemptionAttempt> attempts);
 }
 
-public class ClaudeFraudExplanationService : IFraudExplanationService
+public class GeminiFraudExplanationService : IFraudExplanationService
 {
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
-    private readonly ILogger<ClaudeFraudExplanationService> _logger;
+    private readonly ILogger<GeminiFraudExplanationService> _logger;
 
-    public ClaudeFraudExplanationService(HttpClient http, IConfiguration config, ILogger<ClaudeFraudExplanationService> logger)
+    public GeminiFraudExplanationService(HttpClient http, IConfiguration config, ILogger<GeminiFraudExplanationService> logger)
     {
         _http = http;
         _config = config;
@@ -24,61 +24,62 @@ public class ClaudeFraudExplanationService : IFraudExplanationService
 
     public async Task<string> ExplainAsync(FraudFlag flag, Voucher voucher, List<RedemptionAttempt> attempts)
     {
-        var apiKey = _config["Claude:ApiKey"];
+        var apiKey = _config["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             return $"[AI explanation unavailable — no API key configured] Flag type: {flag.FlagType}";
         }
 
         var prompt = BuildPrompt(flag, voucher, attempts);
+        var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={apiKey}";
 
         var requestBody = new
         {
-            model = "claude-sonnet-4-6",
-            max_tokens = 200,
-            messages = new[] { new { role = "user", content = prompt } }
+            contents = new[]
+            {
+                new { parts = new[] { new { text = prompt } } }
+            }
         };
-
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages")
-        {
-            Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
-        };
-        request.Headers.Add("x-api-key", apiKey);
-        request.Headers.Add("anthropic-version", "2023-06-01");
 
         try
         {
-            var response = await _http.SendAsync(request);
+            var response = await _http.PostAsync(url,
+                new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"));
+
             var body = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Claude API call failed: {Status} {Body}", response.StatusCode, body);
+                _logger.LogWarning("Gemini API call failed: {Status} {Body}", response.StatusCode, body);
                 return $"[AI explanation unavailable] Flag type: {flag.FlagType}";
             }
 
             using var doc = JsonDocument.Parse(body);
             var text = doc.RootElement
-                .GetProperty("content")[0]
+                .GetProperty("candidates")[0]
+                .GetProperty("content")
+                .GetProperty("parts")[0]
                 .GetProperty("text")
                 .GetString();
 
-            return text ?? $"Flag type: {flag.FlagType}";
+            return text?.Trim() ?? $"Flag type: {flag.FlagType}";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling Claude API for fraud explanation");
+            _logger.LogError(ex, "Error calling Gemini API for fraud explanation");
             return $"[AI explanation unavailable] Flag type: {flag.FlagType}";
         }
     }
 
     private static string BuildPrompt(FraudFlag flag, Voucher voucher, List<RedemptionAttempt> attempts)
     {
-        var attemptSummary = string.Join("\n", attempts.Select(a =>
-            $"- {(a.Success ? "SUCCESS" : "FAILED")} at {a.AttemptedAt:HH:mm:ss} from IP {a.IpAddress}"));
+        var attemptSummary = attempts.Count == 0
+            ? "(no redemption attempts recorded yet)"
+            : string.Join("\n", attempts.Select(a =>
+                $"- {(a.Success ? "SUCCESS" : "FAILED")} at {a.AttemptedAt:HH:mm:ss} from IP {a.IpAddress}"));
 
         return $"""
-            You are a fraud analyst assistant for a mobile money voucher platform. 
+            You are a fraud analyst assistant for a mobile money voucher platform.
             Explain in 2-3 plain-English sentences why this voucher was flagged, for a non-technical admin reviewing it.
 
             Flag type: {flag.FlagType}
