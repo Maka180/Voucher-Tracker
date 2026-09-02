@@ -36,6 +36,7 @@ public class FraudDetectionService : BackgroundService
     {
         using var scope = _services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var explanationService = scope.ServiceProvider.GetRequiredService<IFraudExplanationService>();
 
         var cutoff = DateTime.UtcNow.AddHours(-1);
 
@@ -56,11 +57,16 @@ public class FraudDetectionService : BackgroundService
             foreach (var voucher in vouchers)
             {
                 voucher.Status = "Flagged";
-                db.FraudFlags.Add(new FraudFlag
+
+                var flag = new FraudFlag
                 {
                     VoucherId = voucher.Id,
                     FlagType = "BaitPattern"
-                });
+                };
+
+                flag.AiExplanation = await explanationService.ExplainAsync(flag, voucher, new List<RedemptionAttempt>());
+
+                db.FraudFlags.Add(flag);
             }
 
             _logger.LogWarning("Bait pattern flagged for recipient {Phone}: {Count} small vouchers", recipientPhone, vouchers.Count);
@@ -86,11 +92,20 @@ public class FraudDetectionService : BackgroundService
             if (voucher == null || voucher.Status == "Flagged") continue;
 
             voucher.Status = "Flagged";
-            db.FraudFlags.Add(new FraudFlag
+
+            var recentAttempts = await db.RedemptionAttempts
+                .Where(a => a.VoucherId == voucherId && a.AttemptedAt > recentAttemptCutoff)
+                .ToListAsync(ct);
+
+            var flag = new FraudFlag
             {
                 VoucherId = voucherId,
                 FlagType = "DuplicatePin"
-            });
+            };
+
+            flag.AiExplanation = await explanationService.ExplainAsync(flag, voucher, recentAttempts);
+
+            db.FraudFlags.Add(flag);
 
             _logger.LogWarning("Duplicate PIN sharing flagged for voucher {Id}", voucherId);
         }
