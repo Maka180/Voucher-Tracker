@@ -7,7 +7,6 @@ using VoucherTracker.Api.DTOs;
 using VoucherTracker.Api.Models;
 using VoucherTracker.Api.Services;
 
-
 namespace VoucherTracker.Api.Controllers;
 
 [ApiController]
@@ -68,75 +67,107 @@ public class VouchersController : ControllerBase
 
         return Ok(vouchers);
     }
+
     [HttpPost("{id}/redeem")]
-[AllowAnonymous]
-public async Task<ActionResult<RedemptionResponse>> RedeemVoucher(int id, RedeemVoucherRequest request)
-{
-    var voucher = await _db.Vouchers
-        .Include(v => v.RedemptionAttempts)
-        .FirstOrDefaultAsync(v => v.Id == id);
-
-    if (voucher == null)
-        return NotFound(new RedemptionResponse(false, "Voucher not found."));
-
-    var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    var userAgent = Request.Headers.UserAgent.ToString();
-
-    // Already redeemed
-    if (voucher.Status == "Redeemed")
-        return BadRequest(new RedemptionResponse(false, "This voucher has already been redeemed."));
-
-    // Expired
-    if (voucher.Status != "Flagged" && DateTime.UtcNow > voucher.ExpiresAt)
+    [AllowAnonymous]
+    public async Task<ActionResult<RedemptionResponse>> RedeemVoucher(int id, RedeemVoucherRequest request)
     {
-        voucher.Status = "Expired";
-        await _db.SaveChangesAsync();
-        return BadRequest(new RedemptionResponse(false, "This voucher has expired."));
-    }
+        var voucher = await _db.Vouchers
+            .Include(v => v.RedemptionAttempts)
+            .FirstOrDefaultAsync(v => v.Id == id);
 
-    // Locked due to fraud flag / too many failed attempts
-    if (voucher.Status == "Flagged")
-        return BadRequest(new RedemptionResponse(false, "This voucher is locked pending review."));
+        if (voucher == null)
+            return NotFound(new RedemptionResponse(false, "Voucher not found."));
 
-    // Rate limiting: count recent failed attempts (last 5 minutes)
-    var recentFailures = voucher.RedemptionAttempts
-        .Count(a => !a.Success && a.AttemptedAt > DateTime.UtcNow.AddMinutes(-5));
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var userAgent = Request.Headers.UserAgent.ToString();
 
-    if (recentFailures >= 3)
-    {
-        voucher.Status = "Flagged";
-        _db.FraudFlags.Add(new FraudFlag
+        // Already redeemed
+        if (voucher.Status == "Redeemed")
+            return BadRequest(new RedemptionResponse(false, "This voucher has already been redeemed."));
+
+        // Expired
+        if (voucher.Status != "Flagged" && DateTime.UtcNow > voucher.ExpiresAt)
+        {
+            voucher.Status = "Expired";
+            await _db.SaveChangesAsync();
+            return BadRequest(new RedemptionResponse(false, "This voucher has expired."));
+        }
+
+        // Locked due to fraud flag / too many failed attempts
+        if (voucher.Status == "Flagged")
+            return BadRequest(new RedemptionResponse(false, "This voucher is locked pending review."));
+
+        // Rate limiting: count recent failed attempts (last 5 minutes)
+        var recentFailures = voucher.RedemptionAttempts
+            .Count(a => !a.Success && a.AttemptedAt > DateTime.UtcNow.AddMinutes(-5));
+
+        if (recentFailures >= 3)
+        {
+            voucher.Status = "Flagged";
+            _db.FraudFlags.Add(new FraudFlag
+            {
+                VoucherId = voucher.Id,
+                FlagType = "RapidRetry"
+            });
+            await _db.SaveChangesAsync();
+            return BadRequest(new RedemptionResponse(false, "Too many failed attempts. Voucher locked for review."));
+        }
+
+        var isCorrect = BCrypt.Net.BCrypt.Verify(request.Pin, voucher.PinHash);
+
+        _db.RedemptionAttempts.Add(new RedemptionAttempt
         {
             VoucherId = voucher.Id,
-            FlagType = "RapidRetry"
+            Success = isCorrect,
+            DeviceInfo = userAgent,
+            IpAddress = ip
         });
+
+        if (!isCorrect)
+        {
+            await _db.SaveChangesAsync();
+            var remaining = 3 - (recentFailures + 1);
+            await _audit.LogAsync(null, "VoucherLocked", "Voucher", voucher.Id, $"IP={ip}");
+            return BadRequest(new RedemptionResponse(false, $"Incorrect PIN. {remaining} attempt(s) remaining."));
+        }
+
+        voucher.Status = "Redeemed";
+        await _audit.LogAsync(null, "RedeemVoucher", "Voucher", voucher.Id, $"Success, IP={ip}");
+        voucher.RedeemedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
-        return BadRequest(new RedemptionResponse(false, "Too many failed attempts. Voucher locked for review."));
+
+        return Ok(new RedemptionResponse(true, "Voucher redeemed successfully.", voucher.Amount));
     }
 
-    var isCorrect = BCrypt.Net.BCrypt.Verify(request.Pin, voucher.PinHash);
-
-    _db.RedemptionAttempts.Add(new RedemptionAttempt
+    [HttpGet("flagged")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<FlaggedVoucherResponse>>> GetFlaggedVouchers()
     {
-        VoucherId = voucher.Id,
-        Success = isCorrect,
-        DeviceInfo = userAgent,
-        IpAddress = ip
-    });
+        var vouchers = await _db.Vouchers
+            .Where(v => v.Status == "Flagged")
+            .Include(v => v.FraudFlags)
+            .OrderByDescending(v => v.CreatedAt)
+            .Select(v => new FlaggedVoucherResponse(
+                v.Id, v.Amount, v.RecipientPhone, v.Status, v.CreatedAt,
+                v.FraudFlags.Select(f => new FraudFlagResponse(f.Id, f.FlagType, f.AiExplanation, f.FlaggedAt, f.Resolved)).ToList()
+            ))
+            .ToListAsync();
 
-    if (!isCorrect)
-    {
-        await _db.SaveChangesAsync();
-        var remaining = 3 - (recentFailures + 1);
-        await _audit.LogAsync(null, "VoucherLocked", "Voucher", voucher.Id, $"IP={ip}");
-        return BadRequest(new RedemptionResponse(false, $"Incorrect PIN. {remaining} attempt(s) remaining."));
+        return Ok(vouchers);
     }
 
-    voucher.Status = "Redeemed";
-    await _audit.LogAsync(null, "RedeemVoucher", "Voucher", voucher.Id, $"Success, IP={ip}");
-    voucher.RedeemedAt = DateTime.UtcNow;
-    await _db.SaveChangesAsync();
+    [HttpPost("flags/{flagId}/resolve")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> ResolveFlag(int flagId)
+    {
+        var flag = await _db.FraudFlags.FindAsync(flagId);
+        if (flag == null) return NotFound();
 
-    return Ok(new RedemptionResponse(true, "Voucher redeemed successfully.", voucher.Amount));
-}
+        flag.Resolved = true;
+        flag.ResolvedBy = User.FindFirstValue(ClaimTypes.Name);
+        await _db.SaveChangesAsync();
+
+        return Ok();
+    }
 }

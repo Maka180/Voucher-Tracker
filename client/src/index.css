@@ -126,3 +126,189 @@ input {
   margin-top: 1.5rem;
   margin-bottom: 0;
 }
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background: var(--olive-deep);
+  color: var(--cream);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-title {
+  font-size: 1.1rem;
+  color: var(--cream);
+  margin-bottom: 2rem;
+}
+
+.sidebar-user {
+  font-size: 0.85rem;
+  color: #C9CFB5;
+  margin-bottom: auto;
+}
+
+.sidebar-logout {
+  background: none;
+  border: 1px solid #5A6640;
+  color: var(--cream);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  margin-top: 2rem;
+}
+
+.sidebar-logout:hover {
+  background: #333C22;
+}
+
+.main-content {
+  flex: 1;
+  padding: 3rem 4vw;
+  max-width: 720px;
+}
+
+.voucher-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+  margin-bottom: 2.5rem;
+  max-width: 380px;
+}
+
+.pin-reveal {
+  background: #F0F0E0;
+  border: 1px solid var(--olive-sage);
+  padding: 1rem 1.5rem;
+  margin-bottom: 2.5rem;
+  max-width: 380px;
+}
+
+.pin-reveal p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+.pin-code {
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--olive-deep);
+}
+
+.vouchers-heading {
+  margin-top: 0;
+}
+
+.ink-muted {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.voucher-list {
+  border-top: 1px solid var(--border);
+}
+
+.voucher-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.voucher-amount {
+  font-weight: 600;
+  min-width: 70px;
+}
+
+.voucher-recipient {
+  color: var(--ink-muted);
+  flex: 1;
+}
+
+.voucher-date {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
+.status-dot {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-pending { color: var(--olive-sage); border-color: var(--olive-sage); }
+.status-redeemed { color: var(--olive-deep); border-color: var(--olive-deep); }
+.status-expired { color: var(--ink-muted); }
+.status-flagged { color: var(--rust); border-color: var(--rust); }
+.admin-content {
+  max-width: 640px;
+}
+
+.flag-list {
+  margin-top: 2rem;
+}
+
+.flag-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.flag-card-header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: #FBFAF5;
+}
+
+.flag-detail {
+  padding: 1.25rem;
+}
+
+.flag-type-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.flag-type-pill {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--rust);
+  border: 1px solid var(--rust);
+  padding: 0.2rem 0.6rem;
+}
+
+.flag-resolved-pill {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--olive-deep);
+  border: 1px solid var(--olive-deep);
+  padding: 0.2rem 0.6rem;
+}
+
+.flag-explanation {
+  font-size: 0.9rem;
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+}
+
+.btn-small {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+}

@@ -40,6 +40,11 @@ export const api = {
 
   redeemVoucher: (id, pin) =>
     request(`/Vouchers/${id}/redeem`, { method: 'POST', body: JSON.stringify({ pin }) }),
+
+  getFlaggedVouchers: () => request('/Vouchers/flagged'),
+
+  resolveFlag: (flagId) =>
+    request(`/Vouchers/flags/${flagId}/resolve`, { method: 'POST' }),
 };
 
 export function saveSession(token, fullName, role) {
