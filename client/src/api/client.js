@@ -45,6 +45,8 @@ export const api = {
 
   resolveFlag: (flagId) =>
     request(`/Vouchers/flags/${flagId}/resolve`, { method: 'POST' }),
+
+  getFraudNetwork: () => request('/Vouchers/fraud-network'),
 };
 
 export function saveSession(token, fullName, role) {

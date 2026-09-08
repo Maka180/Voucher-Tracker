@@ -170,4 +170,53 @@ public class VouchersController : ControllerBase
 
         return Ok();
     }
+
+    [HttpGet("fraud-network")]
+[Authorize(Roles = "Admin")]
+public async Task<ActionResult<FraudNetworkResponse>> GetFraudNetwork()
+{
+    var flaggedVouchers = await _db.Vouchers
+        .Where(v => v.Status == "Flagged")
+        .Include(v => v.FraudFlags)
+        .Include(v => v.RedemptionAttempts)
+        .ToListAsync();
+
+    var nodes = new List<GraphNode>();
+    var edges = new List<GraphEdge>();
+    var seenPhones = new HashSet<string>();
+    var seenIps = new HashSet<string>();
+
+    foreach (var voucher in flaggedVouchers)
+    {
+        var voucherNodeId = $"voucher-{voucher.Id}";
+        var flagSummary = voucher.FraudFlags.FirstOrDefault()?.AiExplanation
+            ?? voucher.FraudFlags.FirstOrDefault()?.FlagType
+            ?? "Flagged";
+
+        nodes.Add(new GraphNode(voucherNodeId, "voucher", $"R{voucher.Amount}", flagSummary));
+
+        // Recipient phone node
+        var phoneNodeId = $"phone-{voucher.RecipientPhone}";
+        if (seenPhones.Add(voucher.RecipientPhone))
+        {
+            nodes.Add(new GraphNode(phoneNodeId, "phone", voucher.RecipientPhone, null));
+        }
+        edges.Add(new GraphEdge(voucherNodeId, phoneNodeId, "sent_to"));
+
+        // IP nodes from redemption attempts
+        foreach (var ip in voucher.RedemptionAttempts.Select(a => a.IpAddress).Distinct())
+        {
+            if (string.IsNullOrWhiteSpace(ip)) continue;
+
+            var ipNodeId = $"ip-{ip}";
+            if (seenIps.Add(ip))
+            {
+                nodes.Add(new GraphNode(ipNodeId, "ip", ip, null));
+            }
+            edges.Add(new GraphEdge(voucherNodeId, ipNodeId, "attempted_from"));
+        }
+    }
+
+    return Ok(new FraudNetworkResponse(nodes, edges));
+   }
 }

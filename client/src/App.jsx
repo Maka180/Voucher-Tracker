@@ -4,6 +4,7 @@ import Register from './pages/Register';
 import { getSession } from './api/client';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import FraudNetwork from './pages/FraudNetwork';
 
 function RequireAuth({ children }) {
   const { token } = getSession();
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
+        <Route path="/network" element={<RequireAuth><FraudNetwork /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
