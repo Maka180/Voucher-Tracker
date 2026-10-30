@@ -25,3 +25,6 @@ client/.vite/
 # ===== OS =====
 .DS_Store
 Thumbs.db
+
+api/*.db-shm
+api/*.db-wal
