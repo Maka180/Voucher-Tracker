@@ -73,13 +73,30 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
-}); 
+});
 
 var app = builder.Build();
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<VoucherTracker.Api.Data.AppDbContext>();
     db.Database.Migrate();
+
+    // Demo admin, created only if credentials are supplied via environment variables
+    var adminPhone = app.Configuration["Admin:Phone"];
+    var adminPassword = app.Configuration["Admin:Password"];
+    if (!string.IsNullOrWhiteSpace(adminPhone) && !string.IsNullOrWhiteSpace(adminPassword)
+        && !db.Users.Any(u => u.Phone == adminPhone))
+    {
+        db.Users.Add(new VoucherTracker.Api.Models.User
+        {
+            FullName = "Demo Admin",
+            Phone = adminPhone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
+            Role = "Admin"
+        });
+        db.SaveChanges();
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -95,5 +112,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapGet("/", () => Results.Ok(new { status = "Voucher Tracker API is running" }));
 
 app.Run();
