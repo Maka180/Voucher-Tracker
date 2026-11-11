@@ -9,7 +9,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowClient", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "https://voucher-tracker-two.vercel.app"
+              )
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
